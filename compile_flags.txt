@@ -1,0 +1,7 @@
+-ffreestanding
+-fno-builtin
+-Wno-builtin-declaration-mismatch
+-nostdlib
+-std=c11
+-pedantic
+-I../mystdlib/src/
