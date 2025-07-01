@@ -3,7 +3,7 @@
 #include "ministd_string.h"
 
 bool
-match(const char ref src, tok_t ref token, const char ref with)
+match(const char ref src, const tok_t ref token, const char ref with)
 {
 	const usz len = strnlen(with, token->len+1);
 
