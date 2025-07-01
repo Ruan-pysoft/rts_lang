@@ -56,7 +56,7 @@ main(void)
 	item_t item;
 
 	while (toks_pos < toks_len) {
-		item = parse_item(src, toks, toks_len, &toks_pos);
+		item = parse_item(src, toks, toks_len, &toks_pos, NULL);
 
 		item_display(&item, src, stdout, NULL);
 		putc('\n', NULL);

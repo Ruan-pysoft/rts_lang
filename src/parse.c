@@ -6,28 +6,40 @@
 
 #include "lex.h"
 
-word_t parse_word(const char ref src, tok_t ref toks, usz len, usz ref idx);
-stackspec_t parse_stackspec(const char ref src, tok_t ref toks, usz len, usz ref idx);
-block_t parse_block(const char ref src, tok_t ref toks, usz len, usz ref idx);
-assgn_t parse_assgn(const char ref src, tok_t ref toks, usz len, usz ref idx);
+word_t parse_word(const char ref src, tok_t ref toks, usz len, usz ref idx,
+		  perr_t ref perr_out);
+stackspec_t parse_stackspec(const char ref src, tok_t ref toks, usz len,
+			    usz ref idx, perr_t ref perr_out);
+block_t parse_block(const char ref src, tok_t ref toks, usz len, usz ref idx,
+		    perr_t ref perr_out);
+assgn_t parse_assgn(const char ref src, tok_t ref toks, usz len, usz ref idx,
+		    perr_t ref perr_out);
 
-void error(tok_t ref tok, const char ref src, const char ref msg);
-void
-error(tok_t ref tok, const char ref src, const char ref msg)
-{
-	fprints("Error at token ", stderr, NULL);
-	tok_display(tok, src, stderr, NULL);
-	printc('@', NULL);
-	printi(tok->pos.line, NULL);
-	printc(',', NULL);
-	printi(tok->pos.line_pos, NULL);
-	fprints(": ", stderr, NULL);
-	fprints(msg, stderr, NULL);
-	exit(1);
-}
+#define ERROR(res_type, tok, msg) do { \
+		res_type ## _deinit(&res); \
+		if (perr_out != NULL) { \
+			perr_out->at_tok = tok; \
+			perr_out->message = msg; \
+		} else { \
+			perr_t perr; \
+			perr_init(&perr); \
+			perr.at_tok = tok; \
+			perr.message = msg; \
+			perr_display(&perr, src, stderr, NULL); \
+			exit(1); \
+		} \
+		return res; \
+	} while (0)
+#define TRY(res_type) do { \
+		if (perr_out != NULL && perr_has_err(perr_out)) { \
+			res_type ## _deinit(&res); \
+			return res; \
+		} \
+	} while (0)
 
 word_t
-parse_word(const char ref src, tok_t ref toks, usz len, usz ref pos)
+parse_word(const char ref src, tok_t ref toks, usz len, usz ref pos,
+	   perr_t ref perr_out)
 {
 	/* NOTE: assumes *pos < len */
 
@@ -36,7 +48,8 @@ parse_word(const char ref src, tok_t ref toks, usz len, usz ref pos)
 	return toks[(*pos)++];
 }
 stackspec_t
-parse_stackspec(const char ref src, tok_t ref toks, usz len, usz ref pos)
+parse_stackspec(const char ref src, tok_t ref toks, usz len, usz ref pos,
+		perr_t ref perr_out)
 {
 	stackspec_t res;
 	tok_t ref start;
@@ -60,7 +73,8 @@ parse_stackspec(const char ref src, tok_t ref toks, usz len, usz ref pos)
 	memmove(res.in_types, start, sizeof(tok_t) * res.in_len);
 
 	if (*pos == len) {
-		error(&toks[*pos-1], src, "Hit eof while parsing block, expected \"->\"");
+		ERROR(stackspec, &toks[*pos-1],
+		      "Hit eof while parsing block, expected \"->\"");
 	}
 	++*pos;
 
@@ -87,14 +101,16 @@ parse_stackspec(const char ref src, tok_t ref toks, usz len, usz ref pos)
 	}
 
 	if (*pos == len) {
-		error(&toks[*pos-1], src, "Hit eof while parsing block, expected \":\"");
+		ERROR(stackspec, &toks[*pos-1],
+		      "Hit eof while parsing block, expected \":\"");
 	}
 	++*pos;
 
 	return res;
 }
 block_t
-parse_block(const char ref src, tok_t ref toks, usz len, usz ref pos)
+parse_block(const char ref src, tok_t ref toks, usz len, usz ref pos,
+	    perr_t ref perr_out)
 {
 	/* NOTE: assumes *pos < len */
 	block_t res;
@@ -107,27 +123,31 @@ parse_block(const char ref src, tok_t ref toks, usz len, usz ref pos)
 
 	block_init(&res);
 
-	res.stackspec = parse_stackspec(src, toks, len, pos);
+	res.stackspec = parse_stackspec(src, toks, len, pos, perr_out);
+	TRY(block);
 
 	usz cap = 16;
 	res.items = alloc(sizeof(item_t) * cap, NULL);
 
 	while (*pos < len && !match(src, &toks[*pos], "]")) {
-		res.items[res.len++] = parse_item(src, toks, len, pos);
+		res.items[res.len++] = parse_item(src, toks, len, pos, perr_out);
+		TRY(block);
 		if (res.items[res.len-1].type == IT_NULL) {
-			error(&toks[*pos-1], src, "Something went wrong!");
+			ERROR(block, &toks[*pos-1], "Something went wrong!");
 		}
 	}
 
 	if (*pos == len) {
-		error(&toks[*pos-1], src, "Hit eof while parsing block, expected \"]\"");
+		ERROR(block, &toks[*pos-1],
+		      "Hit eof while parsing block, expected \"]\"");
 	}
 	++*pos;
 
 	return res;
 }
 assgn_t
-parse_assgn(const char ref src, tok_t ref toks, usz len, usz ref pos)
+parse_assgn(const char ref src, tok_t ref toks, usz len, usz ref pos,
+	    perr_t ref perr_out)
 {
 	/* NOTE: assumes *pos < len */
 	assgn_t res;
@@ -139,20 +159,23 @@ parse_assgn(const char ref src, tok_t ref toks, usz len, usz ref pos)
 	assgn_init(&res);
 
 	if (!match(src, &toks[*pos], ":=")) {
-		error(&toks[*pos], src, "Expected \":=\"");
+		ERROR(assgn, &toks[*pos], "Expected \":=\"");
 	}
 	++*pos;
 
 	if (*pos == len) {
-		error(&toks[*pos-1], src, "Hit eof while parsing assignment, expected a word");
+		ERROR(assgn, &toks[*pos-1],
+		      "Hit eof while parsing assignment, expected a word");
 	}
 
-	res.word = parse_word(src, toks, len, pos);
+	res.word = parse_word(src, toks, len, pos, perr_out);
+	TRY(assgn);
 
 	return res;
 }
 item_t
-parse_item(const char ref src, tok_t ref toks, usz len, usz ref pos)
+parse_item(const char ref src, tok_t ref toks, usz len, usz ref pos,
+	   perr_t ref perr_out)
 {
 	item_t res;
 
@@ -164,13 +187,16 @@ parse_item(const char ref src, tok_t ref toks, usz len, usz ref pos)
 	if (match(src, &toks[*pos], "[")) {
 		++*pos;
 		res.type = IT_BLOCK;
-		res.item.block = parse_block(src, toks, len, pos);
+		res.item.block = parse_block(src, toks, len, pos, perr_out);
+		TRY(item);
 	} else if (match(src, &toks[*pos], ":=")) {
 		res.type = IT_ASSGN;
-		res.item.assgn = parse_assgn(src, toks, len, pos);
+		res.item.assgn = parse_assgn(src, toks, len, pos, perr_out);
+		TRY(item);
 	} else {
 		res.type = IT_WORD;
-		res.item.word = parse_word(src, toks, len, pos);
+		res.item.word = parse_word(src, toks, len, pos, perr_out);
+		TRY(item);
 	}
 
 	return res;
