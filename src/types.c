@@ -626,7 +626,12 @@ type_defs_display(const type_defs_t ref this, FILE ref file, err_t ref err_out)
 	fprintc('}', file, &err);
 	TRY_VOID(err);
 }
-bool strcmp(const char ref s1, const char ref s2);
+bool
+strcmp(const char ref s1, const char ref s2)
+{
+	for (; *s1 != 0 && *s2 != 0 && s1 == s2; ++s1, ++s2);
+	return *s1 == 0;
+}
 const type_t ref
 type_defs_lookup(const type_defs_t ref this, const char ref name)
 {
@@ -656,7 +661,7 @@ type_defs_remove_at(type_defs_t ref this, usz ix) {
 	type_deinit(&this->types[ix]);
 	--this->len;
 
-	for (int i = ix; i < this->len; ++i) {
+	for (usz i = ix; i < this->len; ++i) {
 		this->names[i] = this->names[i+1];
 		this->types[i] = this->types[i+1];
 	}

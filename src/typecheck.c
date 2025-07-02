@@ -45,7 +45,7 @@ copy_block_type(const block_t ref block, const char ref src,
 	for (usz i = 0; i < block->stackspec.in_len; ++i) {
 		const tok_t tok = block->stackspec.in_types[i];
 		if (src[tok.pos.offset] == '\'') {
-			for (int j = 0; j < res->t.transform.n_generics; ++j) {
+			for (usz j = 0; j < res->t.transform.n_generics; ++j) {
 				if (match(src, &tok, generics[i])) {
 					goto generic_already_found;
 				}
@@ -97,7 +97,7 @@ copy_block_type(const block_t ref block, const char ref src,
 	for (usz block_i = 0, res_i = 0; res_i < res->t.transform.to_len; ++block_i) {
 		const tok_t tok = block->stackspec.out_types[block_i];
 		if (match(src, &tok, "'")) {
-			for (int j = 0; j < res->t.transform.from_len; ++j) {
+			for (usz j = 0; j < res->t.transform.from_len; ++j) {
 				typespec_copy(
 					&res->t.transform.to[res_i+j],
 					&res->t.transform.from[j]
@@ -273,24 +273,105 @@ check_type(const type_t ref type, const type_stack_t ref type_stack)
 	}
 }
 void
+transform_type_stack(const transform_t ref trans, type_stack_t ref type_stack)
+{
+	/* NOTE: assumes it's already been checked that the types align with the stack */
+
+	type_t ref intypes_start = type_stack->top - trans->from_len;
+	type_t own generics = alloc(sizeof(type_t) * trans->n_generics, NULL);
+	usz generics_allocated = 0;
+
+	for (usz i = 0; i < trans->from_len; ++i) {
+		if (trans->from[i].is_generic) {
+			usz generic_idx = trans->from[i].ts.generic.idx;
+			if (generic_idx == generics_allocated) {
+				type_copy(
+					&generics[generic_idx],
+					&intypes_start[i]
+				);
+				++generics_allocated;
+			} else if (generic_idx > generics_allocated) {
+				/* should never happen! */
+				fprints("Something went horribly wrong!\n", stderr, NULL);
+				exit(1);
+			}
+		}
+	}
+
+	for (usz i = 0; i < trans->from_len; ++i) {
+		type_stack_pop(type_stack);
+	}
+
+	if (trans->n_generics != generics_allocated) {
+		/* should never happen! */
+		fprints("Something went horribly wrong!\n", stderr, NULL);
+		exit(1);
+	}
+
+	for (usz i = 0; i < trans->to_len; ++i) {
+		if (trans->to[i].is_generic) {
+			usz generic_idx = trans->to[i].ts.generic.idx;
+			if (generic_idx >= trans->n_generics) {
+				/* should never happen! */
+				fprints("Something went horribly wrong!\n", stderr, NULL);
+				exit(1);
+			}
+			type_stack_push(type_stack, &generics[generic_idx]);
+		} else {
+			type_stack_push(type_stack, &trans->to[i].ts.type);
+		}
+	}
+
+	for (usz i = 0; i < generics_allocated; ++i) {
+		type_deinit(&generics[i]);
+	}
+	free(generics);
+}
+void
 apply_type(const type_t ref type, type_stack_t ref type_stack)
 {
-	/* TODO: */
+	switch (type->type) {
+		case TT_SIMPLE: {
+			type_stack_push(type_stack, type);
+		break; }
+		case TT_TRANSFORM: {
+			transform_type_stack(&type->t.transform, type_stack);
+		break; }
+	}
 }
 bool
 check_and_apply_type(const type_t ref type, type_stack_t ref type_stack)
 {
-	/* TODO: */
+	if (!check_type(type, type_stack)) return false;
+	apply_type(type, type_stack);
+	return true;
 }
 bool
 check_and_apply_block(const block_t ref block, const char ref src,
 		      const type_defs_t ref type_defs,
 		      type_stack_t ref type_stack)
 {
+	/* TODO: Think how to implement this,
+	 * and how that changes what's done before...
+	 * Basically, need the changes the block's type signature would do to the stack,
+	 * then apply all the words inside the block,
+	 * and then finally check that the change to the stack matches the expected change
+	 */
+	return false;
 }
 bool
 check_and_apply_item(const item_t ref item, const char ref src,
 		     const type_defs_t ref type_defs,
 		     type_stack_t ref type_stack)
 {
+	/* TODO: Implement this
+	 * Should be relatively straight forward,
+	 * tho type_defs might need to be mutable,
+	 * so that assignments can be processed?
+	 * For now I think there'll only be a single global scope,
+	 * it'll make typechecking &c much simpler
+	 * (& being stack based,
+	 * the language is much less reliant on variables)
+	 */
+	return false;
 }
