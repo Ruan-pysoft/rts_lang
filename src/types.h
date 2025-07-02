@@ -100,6 +100,7 @@ void simple_type_display(enum simple_type this, FILE ref file, err_t ref err_out
 
 struct typespec_t;
 typedef struct transform_t {
+	usz n_generics;
 	struct typespec_t own from;
 	usz from_len;
 	struct typespec_t own to;

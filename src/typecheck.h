@@ -5,6 +5,7 @@
 
 type_t own get_type(const item_t ref item, const char ref src,
 		    const type_defs_t ref type_defs);
+bool match_type(const type_t ref t1, const type_t ref t2);
 bool check_type(const type_t ref type, const type_stack_t ref type_stack);
 void apply_type(const type_t ref type, type_stack_t ref type_stack);
 bool check_and_apply_type(const type_t ref type, type_stack_t ref type_stack);

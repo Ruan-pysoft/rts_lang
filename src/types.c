@@ -295,6 +295,7 @@ simple_type_display(enum simple_type this, FILE ref file, err_t ref err_out)
 void
 transform_init(transform_t ref this)
 {
+	this->n_generics = 0;
 	this->from = NULL;
 	this->from_len = 0;
 	this->to = NULL;
@@ -303,6 +304,7 @@ transform_init(transform_t ref this)
 void
 transform_deinit(transform_t ref this)
 {
+	this->n_generics = 0;
 	if (this->from) {
 		for (usz i = 0; i < this->from_len; ++i) {
 			typespec_deinit(&this->from[i]);
@@ -351,6 +353,7 @@ transform_display(const transform_t ref this, FILE ref file, err_t ref err_out)
 void
 transform_copy(transform_t ref to, const transform_t ref from)
 {
+	to->n_generics = from->n_generics;
 	to->from_len = from->from_len;
 	to->to_len = from->to_len;
 
