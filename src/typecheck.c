@@ -7,386 +7,355 @@
 #include "lex.h"
 #include "types.h"
 
-type_t own
-gen_assgn_type(void)
+bool
+exec_transform(type_stack_t ref type_stack, const transform_t ref transform)
 {
-	type_t own res = alloc(sizeof(type_t), NULL);
+	if (type_stack->len < transform->from_len) return false;
 
-	type_init(res);
-	res->type = TT_TRANSFORM;
+	generic_map_t genmap;
+	generic_map_init(&genmap, transform->n_generics);
 
-	transform_init(&res->t.transform);
-	res->t.transform.n_generics = 1;
-	res->t.transform.from_len = 1;
-	res->t.transform.from = alloc(sizeof(typespec_t), NULL);
-	typespec_init(res->t.transform.from);
+	for (usz i = 0; i < transform->from_len; ++i) {
+		const type_t ref stack_type = &type_stack->stack[
+			type_stack->len - transform->from_len + i
+		];
+		const type_t ref trans_type = &transform->from[i];
 
-	return res;
-}
-type_t own
-copy_block_type(const block_t ref block, const char ref src,
-		const type_defs_t ref type_defs)
-{
-	type_t own res = alloc(sizeof(type_t), NULL);
+		if (trans_type->type == TT_GENERIC && trans_type->t.gen == genmap.len) {
+			generic_map_add(&genmap, stack_type);
+			continue;
+		} else if (trans_type->type == TT_GENERIC && trans_type->t.gen < genmap.len) {
+			trans_type = &genmap.types[trans_type->t.gen];
+		} else if (trans_type->type == TT_GENERIC && trans_type->t.gen > genmap.len) {
+			/* shouldn't happen ever */
 
-	type_init(res);
-	res->type = TT_TRANSFORM;
+			fprints("Something went horribly wrong while applying transform input types", stderr, 0);
+			exit(1);
+		}
 
-	transform_init(&res->t.transform);
-	res->t.transform.from_len = block->stackspec.in_len;
-	res->t.transform.from = alloc(
-		sizeof(typespec_t) * res->t.transform.from_len, NULL
-	);
-
-	char own own generics = alloc(
-		sizeof(char own) * res->t.transform.from_len, NULL
-	);
-	res->t.transform.n_generics = 0;
-	for (usz i = 0; i < block->stackspec.in_len; ++i) {
-		const tok_t tok = block->stackspec.in_types[i];
-		if (src[tok.pos.offset] == '\'') {
-			for (usz j = 0; j < res->t.transform.n_generics; ++j) {
-				if (match(src, &tok, generics[j])) {
-					goto generic_already_found;
+		if (trans_type->type != stack_type->type) return false;
+		switch (trans_type->type) {
+			case TT_SIMPLE: {
+				if (trans_type->t.simple != stack_type->t.simple) {
+					return false;
 				}
-			}
-			generics[res->t.transform.n_generics] = alloc(
-				sizeof(char) * (tok.len+1), NULL
-			);
-			memmove(
-				generics[res->t.transform.n_generics],
-				src+tok.pos.offset, tok.len
-			);
-			generics[res->t.transform.n_generics][tok.len] = 0;
-			++res->t.transform.n_generics;
-		generic_already_found:;
-		}
-	}
-
-	for (usz i = 0; i < res->t.transform.from_len; ++i) {
-		const tok_t tok = block->stackspec.in_types[i];
-		if (src[tok.pos.offset] == '\'') {
-			usz generic_num;
-			for (generic_num = 0;
-				!match(src, &tok, generics[generic_num]);
-				++generic_num);
-
-			typespec_init(&res->t.transform.from[i]);
-			res->t.transform.from[i].ts.generic.idx = generic_num;
-		} else {
-			typespec_init(&res->t.transform.from[i]);
-			res->t.transform.from[i].is_generic = false;
-			res->t.transform.from[i].ts.type.type = TT_SIMPLE;
-			if (match(src, &tok, "int")) {
-				res->t.transform.from[i].ts.type.t.simple = ST_INT;
-			} else if (match(src, &tok, "bool")) {
-				res->t.transform.from[i].ts.type.t.simple = ST_BOOL;
-			} else {
-				/* This should never happen! */
-				fprints("Something went wrong!", stderr, 0);
+			break; }
+			case TT_GENERIC: {
+				if (trans_type->t.gen != stack_type->t.gen) {
+					return false;
+				}
+			break; }
+			case TT_TRANSFORM: {
+				/* Not possible for now, TODO: deal with this later */
 				exit(1);
-			}
+			break; }
 		}
 	}
 
-	res->t.transform.to_len = 0;
-	for (usz i = 0; i < block->stackspec.out_len; ++i) {
-		const tok_t tok = block->stackspec.out_types[i];
-		if (match(src, &tok, "'")) {
-			res->t.transform.to_len += res->t.transform.from_len;
-		} else {
-			res->t.transform.to_len += 1;
-		}
-	}
-	res->t.transform.to = alloc(
-		sizeof(typespec_t) * res->t.transform.to_len, NULL
-	);
-
-	for (usz block_i = 0, res_i = 0; res_i < res->t.transform.to_len; ++block_i) {
-		const tok_t tok = block->stackspec.out_types[block_i];
-		if (match(src, &tok, "'")) {
-			for (usz j = 0; j < res->t.transform.from_len; ++j) {
-				typespec_copy(
-					&res->t.transform.to[res_i+j],
-					&res->t.transform.from[j]
-				);
-			}
-			res_i += res->t.transform.from_len;
-		} else if (src[tok.pos.offset] == '\'') {
-			usz generic_num;
-			for (generic_num = 0;
-				!match(src, &tok, generics[generic_num])
-				&& generic_num < res->t.transform.n_generics;
-				++generic_num);
-
-			if (generic_num == res->t.transform.n_generics) {
-				/* TODO: report & propogate type errors properly */
-				fprints("TYPE ERROR: referencing a generic type in the output not present in the input", stderr, NULL);
-				exit(1);
-			}
-
-			typespec_init(&res->t.transform.to[res_i]);
-			res->t.transform.to[res_i].ts.generic.idx = generic_num;
-
-			++res_i;
-		} else {
-			typespec_init(&res->t.transform.to[res_i]);
-			res->t.transform.to[res_i].is_generic = false;
-			res->t.transform.to[res_i].ts.type.type = TT_SIMPLE;
-			if (match(src, &tok, "int")) {
-				res->t.transform.to[res_i].ts.type.t.simple = ST_INT;
-			} else if (match(src, &tok, "bool")) {
-				res->t.transform.to[res_i].ts.type.t.simple = ST_BOOL;
-			} else {
-				/* This should never happen! */
-				fprints("Something went wrong!", stderr, 0);
-				exit(1);
-			}
-
-			++res_i;
-		}
-	}
-
-	return res;
-}
-
-type_t own
-get_type(const item_t ref item, const char ref src,
-	 const type_defs_t ref type_defs)
-{
-	switch (item->type) {
-		case IT_NULL: {
-			return NULL;
-		break; }
-		case IT_WORD: {
-			type_t own res = alloc(sizeof(type_t), NULL);
-			type_copy(res, type_defs_lookup_word(
-				type_defs, &item->item.word, src
-			));
-			return res;
-		break; }
-		case IT_ASSGN: {
-			return gen_assgn_type();
-		break; }
-		case IT_BLOCK: {
-			return copy_block_type(&item->item.block, src, type_defs);
-		break; }
-	}
-
-	return NULL;
-}
-bool
-match_typespec(const typespec_t ref ts1, const typespec_t ref ts2)
-{
-	if (ts1->is_generic != ts2->is_generic) return false;
-
-	if (ts1->is_generic) {
-		return ts1->ts.generic.idx == ts2->ts.generic.idx;
-	} else {
-		return match_type(&ts1->ts.type, &ts2->ts.type);
-	}
-}
-bool
-match_type(const type_t ref t1, const type_t ref t2)
-{
-	if (t1->type != t2->type) return false;
-
-	switch (t1->type) {
-		case TT_SIMPLE: {
-			return t1->t.simple == t2->t.simple;
-		break; }
-		case TT_TRANSFORM: {
-			if (t1->t.transform.n_generics != t2->t.transform.n_generics) {
-				return false;
-			}
-			for (usz i = 0; i < t1->t.transform.from_len; ++i) {
-				const typespec_t ref t1_from = &t1->t.transform.from[i];
-				const typespec_t ref t2_from = &t2->t.transform.from[i];
-				if (!match_typespec(t1_from, t2_from)) return false;
-			}
-			for (usz i = 0; i < t1->t.transform.to_len; ++i) {
-				const typespec_t ref t1_to = &t1->t.transform.to[i];
-				const typespec_t ref t2_to = &t2->t.transform.to[i];
-				if (!match_typespec(t1_to, t2_to)) return false;
-			}
-			return true;
-		break; }
-	}
-}
-bool
-check_transform(const transform_t ref trans, const type_stack_t ref type_stack)
-{
-	/* NOTE: assumes type stack's len is >= no. of input types */
-
-	type_t ref intypes_start = type_stack->top - trans->from_len;
-	type_t own generics = alloc(sizeof(type_t) * trans->n_generics, NULL);
-	usz generics_allocated = 0;
-
-	for (usz i = 0; i < trans->from_len; ++i) {
-		type_t ref type = NULL;
-		if (trans->from[i].is_generic) {
-			usz generic_idx = trans->from[i].ts.generic.idx;
-			type = &generics[generic_idx];
-			if (generic_idx == generics_allocated) {
-				type_copy(type, &intypes_start[i]);
-				++generics_allocated;
-				/* guaranteed match, no need checking */
-				continue;
-			} else if (generic_idx > generics_allocated) {
-				/* should never happen! */
-				fprints("Something went horribly wrong!\n", stderr, NULL);
-				exit(1);
-			}
-		} else {
-			type = &trans->from[i].ts.type;
-		}
-
-		if (!match_type(type, &intypes_start[i])) {
-			for (usz i = 0; i < generics_allocated; ++i) {
-				type_deinit(&generics[i]);
-			}
-			free(generics);
-			return false;
-		}
-	}
-
-	for (usz i = 0; i < generics_allocated; ++i) {
-		type_deinit(&generics[i]);
-	}
-	free(generics);
-	return true;
-}
-bool
-check_type(const type_t ref type, const type_stack_t ref type_stack)
-{
-	usz min_stack_len;
-
-	switch (type->type) {
-		case TT_SIMPLE: {
-			min_stack_len = 0;
-		break; }
-		case TT_TRANSFORM: {
-			min_stack_len = type->t.transform.from_len;
-		break; }
-	}
-
-	if (type_stack->top - type_stack->stack < min_stack_len) {
-		return false;
-	}
-
-	switch (type->type) {
-		case TT_SIMPLE: {
-			/* A simple type always pushes a value to the stack,
-			 * and does not depend on the current value of the stack,
-			 * so the state of the stack is irrelevant
-			 */
-			return true;
-		break; }
-		case TT_TRANSFORM: {
-			return check_transform(&type->t.transform, type_stack);
-		break; }
-	}
-}
-void
-transform_type_stack(const transform_t ref trans, type_stack_t ref type_stack)
-{
-	/* NOTE: assumes it's already been checked that the types align with the stack */
-
-	type_t ref intypes_start = type_stack->top - trans->from_len;
-	type_t own generics = alloc(sizeof(type_t) * trans->n_generics, NULL);
-	usz generics_allocated = 0;
-
-	for (usz i = 0; i < trans->from_len; ++i) {
-		if (trans->from[i].is_generic) {
-			usz generic_idx = trans->from[i].ts.generic.idx;
-			if (generic_idx == generics_allocated) {
-				type_copy(
-					&generics[generic_idx],
-					&intypes_start[i]
-				);
-				++generics_allocated;
-			} else if (generic_idx > generics_allocated) {
-				/* should never happen! */
-				fprints("Something went horribly wrong!\n", stderr, NULL);
-				exit(1);
-			}
-		}
-	}
-
-	for (usz i = 0; i < trans->from_len; ++i) {
+	for (usz i = 0; i < transform->from_len; ++i) {
 		type_stack_pop(type_stack);
 	}
 
-	if (trans->n_generics != generics_allocated) {
-		/* should never happen! */
-		fprints("Something went horribly wrong!\n", stderr, NULL);
-		exit(1);
-	}
+	for (usz i = 0; i < transform->to_len; ++i) {
+		const type_t ref trans_type = &transform->to[i];
 
-	for (usz i = 0; i < trans->to_len; ++i) {
-		if (trans->to[i].is_generic) {
-			usz generic_idx = trans->to[i].ts.generic.idx;
-			if (generic_idx >= trans->n_generics) {
-				/* should never happen! */
-				fprints("Something went horribly wrong!\n", stderr, NULL);
+		if (trans_type->type == TT_GENERIC) {
+			if (trans_type->t.gen >= genmap.len) {
+				/* shouldn't happen ever */
+
+				fprints("Something went horribly wrong while applying transform output types", stderr, 0);
 				exit(1);
 			}
-			type_stack_push(type_stack, &generics[generic_idx]);
-		} else {
-			type_stack_push(type_stack, &trans->to[i].ts.type);
+
+			trans_type = &genmap.types[trans_type->t.gen];
 		}
+
+		type_stack_push(type_stack, trans_type);
 	}
 
-	for (usz i = 0; i < generics_allocated; ++i) {
-		type_deinit(&generics[i]);
-	}
-	free(generics);
+	return true;
 }
-void
-apply_type(const type_t ref type, type_stack_t ref type_stack)
+
+bool
+exec_type(type_stack_t ref type_stack, const type_t ref type)
 {
 	switch (type->type) {
 		case TT_SIMPLE: {
 			type_stack_push(type_stack, type);
+			return true;
+		break; }
+		case TT_GENERIC: {
+			type_stack_push(type_stack, type);
+			return true;
 		break; }
 		case TT_TRANSFORM: {
-			transform_type_stack(&type->t.transform, type_stack);
+			return exec_transform(type_stack, &type->t.trans);
 		break; }
 	}
+
+	return false;
 }
+
 bool
-check_and_apply_type(const type_t ref type, type_stack_t ref type_stack)
+stackspec_to_transform(const stackspec_t ref stackspec, const char ref src,
+		       transform_t ref trans_out)
 {
-	if (!check_type(type, type_stack)) return false;
-	apply_type(type, type_stack);
+	transform_init(trans_out);
+
+	char own own generics = alloc(sizeof(char own) * stackspec->in_len, NULL);
+
+	trans_out->from_len = stackspec->in_len;
+	trans_out->from = alloc(sizeof(type_t) * trans_out->from_len, NULL);
+	for (usz i = 0; i < stackspec->in_len; ++i) {
+		if (src[stackspec->in_types[i].pos.offset] == '\'') {
+			for (usz j = 0; j < trans_out->n_generics; ++j) {
+				if (match(src, &stackspec->in_types[i], generics[j])) {
+					type_init(&trans_out->from[i]);
+					trans_out->from[i].type = TT_GENERIC;
+					trans_out->from[i].t.gen = j;
+					goto found_generic;
+				}
+			}
+
+			generics[trans_out->n_generics] = alloc(stackspec->in_types[i].len + 1, NULL);
+			memmove(generics[trans_out->n_generics], src + stackspec->in_types[i].pos.offset, stackspec->in_types[i].len);
+			generics[trans_out->n_generics][stackspec->in_types[i].len] = 0;
+			trans_out->from[i].type = TT_GENERIC;
+			trans_out->from[i].t.gen = trans_out->n_generics;
+			++trans_out->n_generics;
+
+		found_generic:;
+		} else {
+			type_init(&trans_out->from[i]);
+			if (match(src, &stackspec->in_types[i], "int")) {
+				trans_out->from[i].t.simple = ST_INT;
+			} else if (match(src, &stackspec->in_types[i], "bool")) {
+				trans_out->from[i].t.simple = ST_BOOL;
+			} else {
+				fprints("Invalid type!", stderr, NULL);
+				exit(1);
+			}
+		}
+	}
+
+	for (usz i = 0; i < stackspec->out_len; ++i) {
+		if (match(src, &stackspec->out_types[i], "'")) {
+			trans_out->to_len += trans_out->from_len;
+		} else {
+			++trans_out->to_len;
+		}
+	}
+	trans_out->to = alloc(sizeof(type_t) * trans_out->to_len, NULL);
+	usz trans_i = 0;
+	for (usz i = 0; i < stackspec->out_len; ++i) {
+		if (match(src, &stackspec->out_types[i], "'")) {
+			for (usz j = 0; j < trans_out->from_len; ++j) {
+				type_copy(&trans_out->to[trans_i + j], &trans_out->from[j]);
+			}
+			trans_i += trans_out->from_len;
+		} else if (src[stackspec->out_types[i].pos.offset] == '\'') {
+				usz j = 0;
+				for (; j < trans_out->n_generics; ++j) {
+					if (match(src, &stackspec->out_types[i], generics[j])) {
+						type_init(&trans_out->to[trans_i]);
+						trans_out->to[trans_i].type = TT_GENERIC;
+						trans_out->to[trans_i].t.gen = j;
+						break;
+					}
+				}
+
+				if (j == trans_out->n_generics) {
+					/* generic not in input types */
+					fprints("Invalid generic!", stderr, NULL);
+					exit(1);
+				}
+
+			++trans_i;
+		} else {
+			type_init(&trans_out->to[trans_i]);
+			if (match(src, &stackspec->out_types[i], "int")) {
+				trans_out->to[trans_i].t.simple = ST_INT;
+			} else if (match(src, &stackspec->out_types[i], "bool")) {
+				trans_out->to[trans_i].t.simple = ST_BOOL;
+			} else {
+				fprints("Invalid type!", stderr, NULL);
+				exit(1);
+			}
+			++trans_i;
+		}
+	}
+
 	return true;
 }
 bool
-check_and_apply_block(const block_t ref block, const char ref src,
-		      const type_defs_t ref type_defs,
-		      type_stack_t ref type_stack)
+resolve_type(type_t ref type_out, const item_t ref item, const char ref src,
+	     const type_defs_t ref type_defs)
 {
-	/* TODO: Think how to implement this,
-	 * and how that changes what's done before...
-	 * Basically, need the changes the block's type signature would do to the stack,
-	 * then apply all the words inside the block,
-	 * and then finally check that the change to the stack matches the expected change
-	 */
+	switch (item->type) {
+		case IT_NULL: {
+			return false;
+		break; }
+		case IT_ASSGN: {
+			/* isn't supposed to happen anyways */
+			return false;
+		break; }
+		case IT_WORD: {
+			const type_t ref looked_up = type_defs_lookup_word(
+				type_defs, &item->item.word, src
+			);
+			if (looked_up == NULL) return false;
+			type_copy(type_out, looked_up);
+			return true;
+		break; }
+		case IT_BLOCK: {
+			type_init(type_out);
+			type_out->type = TT_TRANSFORM;
+			return stackspec_to_transform(
+				&item->item.block.stackspec, src,
+				&type_out->t.trans
+			);
+		break; }
+	}
 	return false;
 }
-bool
-check_and_apply_item(const item_t ref item, const char ref src,
-		     const type_defs_t ref type_defs,
-		     type_stack_t ref type_stack)
+
+void
+type_stack_start(type_stack_t ref type_stack_out,
+		 const transform_t ref transform)
 {
-	/* TODO: Implement this
-	 * Should be relatively straight forward,
-	 * tho type_defs might need to be mutable,
-	 * so that assignments can be processed?
-	 * For now I think there'll only be a single global scope,
-	 * it'll make typechecking &c much simpler
-	 * (& being stack based,
-	 * the language is much less reliant on variables)
-	 */
-	return false;
+	type_stack_init(type_stack_out);
+	type_stack_out->len = transform->from_len;
+	if (type_stack_out->len > type_stack_out->cap) {
+		type_stack_out->cap = type_stack_out->len;
+		type_stack_out->stack = realloc(
+			type_stack_out->stack,
+			sizeof(type_t) * type_stack_out->cap,
+			NULL
+		);
+	}
+	for (usz i = 0; i < transform->from_len; ++i) {
+		type_copy(&type_stack_out->stack[i], &transform->from[i]);
+	}
+}
+
+bool
+type_stack_check(const type_stack_t ref type_stack,
+		 const transform_t ref transform)
+{
+	if (type_stack->len != transform->to_len) return false;
+
+	for (usz i = 0; i < transform->to_len; ++i) {
+		const type_t ref stack_type = &type_stack->stack[i];
+		const type_t ref trans_type = &transform->to[i];
+
+		if (stack_type->type != trans_type->type) {
+			return false;
+		}
+
+		switch (stack_type->type) {
+			case TT_SIMPLE: {
+				if (stack_type->t.simple != trans_type->t.simple) {
+					return false;
+				}
+			break; }
+			case TT_GENERIC: {
+				if (stack_type->t.gen != trans_type->t.gen) {
+					return false;
+				}
+			break; }
+			case TT_TRANSFORM: {
+				/* Not possible for now, TODO: deal with this later */
+				exit(1);
+			break; }
+		}
+	}
+
+	return true;
+}
+
+bool
+apply_item(type_stack_t ref type_stack, const item_t ref item,
+	   const char ref src, const type_defs_t ref type_defs)
+{
+	if (item->type == IT_ASSGN) {
+		return false;
+	}
+
+	type_t item_type;
+	if (!resolve_type(&item_type, item, src, type_defs)) return false;
+
+	if (item->type == IT_WORD) {
+		bool res = exec_type(type_stack, &item_type);
+		type_deinit(&item_type);
+
+		return res;
+	} else {
+		type_stack_push(type_stack, &item_type);
+		type_deinit(&item_type);
+
+		return true;
+	}
+}
+
+bool
+apply_item_toplevel(type_stack_t ref type_stack, const item_t ref item,
+		    const char ref src, type_defs_t ref type_defs)
+{
+	if (item->type == IT_ASSGN) {
+		if (type_stack->len == 0) {
+			return false;
+		}
+		if (type_stack_peek(type_stack)->type == TT_GENERIC) {
+			return false;
+		}
+
+		type_defs_add_word(
+			type_defs, &item->item.assgn.word, src,
+			type_stack_peek(type_stack)
+		);
+		type_stack_pop(type_stack);
+
+		return true;
+	}
+
+	type_t item_type;
+	if (!resolve_type(&item_type, item, src, type_defs)) return false;
+
+	if (item->type == IT_WORD) {
+		bool res = exec_type(type_stack, &item_type);
+		type_deinit(&item_type);
+
+		return res;
+	} else {
+		type_stack_push(type_stack, &item_type);
+		type_deinit(&item_type);
+
+		return true;
+	}
+}
+
+bool
+check_block(const block_t ref block, const char ref src,
+	    const type_defs_t ref type_defs)
+{
+	type_stack_t type_stack;
+	transform_t trans;
+
+	if (!stackspec_to_transform(&block->stackspec, src, &trans)) return false;
+	type_stack_start(&type_stack, &trans);
+
+	for (usz i = 0; i < block->len; ++i) {
+		if (!apply_item(&type_stack, &block->items[i], src, type_defs)) {
+			type_stack_deinit(&type_stack);
+			transform_deinit(&trans);
+
+			return false;
+		}
+	}
+
+	bool res = type_stack_check(&type_stack, &trans);
+	type_stack_deinit(&type_stack);
+	transform_deinit(&trans);
+
+	return res;
 }

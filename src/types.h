@@ -98,12 +98,12 @@ enum simple_type {
 };
 void simple_type_display(enum simple_type this, FILE ref file, err_t ref err_out);
 
-struct typespec_t;
+struct type_t;
 typedef struct transform_t {
 	usz n_generics;
-	struct typespec_t own from;
+	struct type_t own from;
 	usz from_len;
-	struct typespec_t own to;
+	struct type_t own to;
 	usz to_len;
 } transform_t;
 void transform_init(transform_t ref this);
@@ -115,13 +115,15 @@ void transform_copy(transform_t ref to, const transform_t ref from);
 enum type_type {
 	TT_SIMPLE,
 	TT_TRANSFORM,
+	TT_GENERIC,
 };
 
 typedef struct type_t {
 	enum type_type type;
 	union type_union {
 		enum simple_type simple;
-		transform_t transform;
+		transform_t trans;
+		usz gen;
 	} t;
 } type_t;
 void type_init(type_t ref this);
@@ -129,30 +131,9 @@ void type_deinit(type_t ref this);
 void type_display(const type_t ref this, FILE ref file, err_t ref err_out);
 void type_copy(type_t ref to, const type_t ref from);
 
-typedef struct generic_t {
-	unsigned idx;
-} generic_t;
-void generic_init(generic_t ref this);
-void generic_deinit(generic_t ref this);
-void generic_display(const generic_t ref this, FILE ref file,
-		     err_t ref err_out);
-
-typedef struct typespec_t {
-	bool is_generic;
-	union typespec_union {
-		type_t type;
-		generic_t generic;
-	} ts;
-} typespec_t;
-void typespec_init(typespec_t ref this);
-void typespec_deinit(typespec_t ref this);
-void typespec_display(const typespec_t ref this, FILE ref file,
-		      err_t ref err_out);
-void typespec_copy(typespec_t ref to, const typespec_t ref from);
-
 typedef struct type_stack_t {
 	type_t own stack;
-	type_t ref top;
+	usz len;
 	usz cap;
 } type_stack_t;
 void type_stack_init(type_stack_t ref this);
@@ -167,9 +148,11 @@ typedef struct generic_map_t {
 	/* generics are labeled sequentially starting with 0,
 	 * no need for an array of generics */
 	type_t own types;
+	usz cap;
 	usz len;
 } generic_map_t;
-void generic_map_init(generic_map_t ref this);
+void generic_map_init(generic_map_t ref this, usz n_generics);
+void generic_map_add(generic_map_t ref this, const type_t ref type);
 void generic_map_deinit(generic_map_t ref this);
 void generic_map_display(const generic_map_t ref this, FILE ref file,
 			 err_t ref err_out);

@@ -51,6 +51,8 @@ Currently there are three syntactic units:
     and assigns it to the word following
  3. A "block", which pushes the block described to the stack
 
+For now, assignments can only be called at the top level.
+
 There are two types of types (besides generics:
 
  1. A "simple" type (bool, int).

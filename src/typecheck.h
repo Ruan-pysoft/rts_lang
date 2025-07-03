@@ -3,17 +3,18 @@
 
 #include "types.h"
 
-type_t own get_type(const item_t ref item, const char ref src,
-		    const type_defs_t ref type_defs);
-bool match_type(const type_t ref t1, const type_t ref t2);
-bool check_type(const type_t ref type, const type_stack_t ref type_stack);
-void apply_type(const type_t ref type, type_stack_t ref type_stack);
-bool check_and_apply_type(const type_t ref type, type_stack_t ref type_stack);
-bool check_and_apply_block(const block_t ref block, const char ref src,
-			   const type_defs_t ref type_defs,
-			   type_stack_t ref type_stack);
-bool check_and_apply_item(const item_t ref item, const char ref src,
-			  const type_defs_t ref type_defs,
-			  type_stack_t ref type_stack);
+bool exec_type(type_stack_t ref type_stack, const type_t ref type);
+bool resolve_type(type_t ref type_out, const item_t ref item,
+		  const char ref src, const type_defs_t ref type_defs);
+void type_stack_start(type_stack_t ref type_stack_out,
+		      const transform_t ref transform);
+bool type_stack_check(const type_stack_t ref type_stack,
+		      const transform_t ref transform);
+bool apply_item(type_stack_t ref type_stack, const item_t ref item,
+		const char ref src, const type_defs_t ref type_defs);
+bool apply_item_toplevel(type_stack_t ref type_stack, const item_t ref item,
+			 const char ref src, type_defs_t ref type_defs);
+bool check_block(const block_t ref block, const char ref src,
+		 const type_defs_t ref type_defs);
 
 #endif /* TYPECHECK_H */

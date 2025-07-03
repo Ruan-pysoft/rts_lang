@@ -307,7 +307,7 @@ transform_deinit(transform_t ref this)
 	this->n_generics = 0;
 	if (this->from) {
 		for (usz i = 0; i < this->from_len; ++i) {
-			typespec_deinit(&this->from[i]);
+			type_deinit(&this->from[i]);
 		}
 		free(this->from);
 		this->from = NULL;
@@ -315,7 +315,7 @@ transform_deinit(transform_t ref this)
 	this->from_len = 0;
 	if (this->to) {
 		for (usz i = 0; i < this->to_len; ++i) {
-			typespec_deinit(&this->to[i]);
+			type_deinit(&this->to[i]);
 		}
 		free(this->to);
 		this->to = NULL;
@@ -331,7 +331,7 @@ transform_display(const transform_t ref this, FILE ref file, err_t ref err_out)
 	TRY_VOID(err);
 
 	for (usz i = 0; i < this->from_len; ++i) {
-		typespec_display(&this->from[i], file, &err);
+		type_display(&this->from[i], file, &err);
 		TRY_VOID(err);
 		fprintc(' ', file, &err);
 		TRY_VOID(err);
@@ -343,7 +343,7 @@ transform_display(const transform_t ref this, FILE ref file, err_t ref err_out)
 	for (usz i = 0; i < this->to_len; ++i) {
 		fprintc(' ', file, &err);
 		TRY_VOID(err);
-		typespec_display(&this->to[i], file, &err);
+		type_display(&this->to[i], file, &err);
 		TRY_VOID(err);
 	}
 
@@ -357,14 +357,14 @@ transform_copy(transform_t ref to, const transform_t ref from)
 	to->from_len = from->from_len;
 	to->to_len = from->to_len;
 
-	to->from = alloc(sizeof(typespec_t) * to->from_len, NULL);
+	to->from = alloc(sizeof(type_t) * to->from_len, NULL);
 	for (usz i = 0; i < to->from_len; ++i) {
-		typespec_copy(&to->from[i], &from->from[i]);
+		type_copy(&to->from[i], &from->from[i]);
 	}
 
-	to->to = alloc(sizeof(typespec_t) * to->to_len, NULL);
+	to->to = alloc(sizeof(type_t) * to->to_len, NULL);
 	for (usz i = 0; i < to->to_len; ++i) {
-		typespec_copy(&to->to[i], &from->to[i]);
+		type_copy(&to->to[i], &from->to[i]);
 	}
 }
 
@@ -381,8 +381,11 @@ type_deinit(type_t ref this)
 		case TT_SIMPLE: {
 			type_init(this);
 		break; }
+		case TT_GENERIC: {
+			type_init(this);
+		break; }
 		case TT_TRANSFORM: {
-			transform_deinit(&this->t.transform);
+			transform_deinit(&this->t.trans);
 			type_init(this);
 		break; }
 	}
@@ -394,8 +397,15 @@ type_display(const type_t ref this, FILE ref file, err_t ref err_out)
 		case TT_SIMPLE: {
 			simple_type_display(this->t.simple, file, err_out);
 		break; }
+		case TT_GENERIC: {
+			err_t err = ERR_OK;
+
+			fprintc('\'', file, &err);
+			TRY_VOID(err);
+			fprintuz(this->t.gen, file, err_out);
+		break; }
 		case TT_TRANSFORM: {
-			transform_display(&this->t.transform, file, err_out);
+			transform_display(&this->t.trans, file, err_out);
 		break; }
 	}
 }
@@ -407,66 +417,12 @@ type_copy(type_t ref to, const type_t ref from)
 		case TT_SIMPLE: {
 			to->t.simple = from->t.simple;
 		break; }
-		case TT_TRANSFORM: {
-			transform_copy(&to->t.transform, &from->t.transform);
+		case TT_GENERIC: {
+			to->t.gen = from->t.gen;
 		break; }
-	}
-}
-
-void
-generic_init(generic_t ref this)
-{
-	this->idx = 0;
-}
-void
-generic_deinit(generic_t ref this)
-{ generic_init(this); }
-void
-generic_display(const generic_t ref this, FILE ref file, err_t ref err_out)
-{
-	err_t err = ERR_OK;
-
-	fprintc('\'', file, &err);
-	TRY_VOID(err);
-	fprintu(this->idx, file, &err);
-	TRY_VOID(err);
-}
-
-void
-typespec_init(typespec_t ref this)
-{
-	this->is_generic = true;
-	generic_init(&this->ts.generic);
-}
-void
-typespec_deinit(typespec_t ref this)
-{
-	if (this->is_generic) {
-		generic_deinit(&this->ts.generic);
-	} else {
-		type_deinit(&this->ts.type);
-		this->is_generic = true;
-		generic_init(&this->ts.generic);
-		generic_deinit(&this->ts.generic);
-	}
-}
-void
-typespec_display(const typespec_t ref this, FILE ref file, err_t ref err_out)
-{
-	if (this->is_generic) {
-		generic_display(&this->ts.generic, file, err_out);
-	} else {
-		type_display(&this->ts.type, file, err_out);
-	}
-}
-void
-typespec_copy(typespec_t ref to, const typespec_t ref from)
-{
-	to->is_generic = from->is_generic;
-	if (from->is_generic) {
-		to->ts.generic = from->ts.generic;
-	} else {
-		type_copy(&to->ts.type, &from->ts.type);
+		case TT_TRANSFORM: {
+			transform_copy(&to->t.trans, &from->t.trans);
+		break; }
 	}
 }
 
@@ -475,19 +431,19 @@ type_stack_init(type_stack_t ref this)
 {
 	this->cap = 256;
 	this->stack = alloc(sizeof(type_t) * this->cap, NULL);
-	this->top = this->stack;
+	this->len = 0;
 }
 void
 type_stack_deinit(type_stack_t ref this)
 {
 	if (this->stack) {
-		for (type_t ref tp = this->stack; tp < this->top; ++tp) {
-			type_deinit(tp);
+		for (usz i = 0; i < this->len; ++i) {
+			type_deinit(&this->stack[i]);
 		}
 		free(this->stack);
 	}
 	this->stack = NULL;
-	this->top = NULL;
+	this->len = 0;
 	this->cap = 0;
 }
 void
@@ -496,47 +452,53 @@ type_stack_display(const type_stack_t ref this, const char ref src,
 {
 	err_t err = ERR_OK;
 
-	for (type_t ref tp = this->stack; tp < this->top; ++tp) {
-		if (tp != this->stack) {
+	for (usz i = 0; i < this->len; ++i) {
+		if (i != 0) {
 			fprintc(' ', file, &err);
 			TRY_VOID(err);
 		}
-		type_display(tp, file, &err);
+		type_display(&this->stack[i], file, &err);
 		TRY_VOID(err);
 	}
 }
 const type_t ref
 type_stack_peek(const type_stack_t ref this)
 {
-	if (this->top == this->stack) return NULL;
-	return this->top - 1;
+	if (this->len == 0) return NULL;
+	return &this->stack[this->len - 1];
 }
 void
 type_stack_pop(type_stack_t ref this)
 {
-	if (this->top == this->stack) return;
-	--this->top;
-	type_deinit(this->top);
+	if (this->len == 0) return;
+	--this->len;
+	type_deinit(&this->stack[this->len]);
 }
 void
 type_stack_push(type_stack_t ref this, const type_t ref type)
 {
-	if (this->top - this->stack == this->cap) {
+	if (this->len == this->cap) {
 		this->stack = realloc(
 			this->stack, sizeof(type_t) * this->cap * 2, NULL
 		);
-		this->top = this->stack + this->cap;
 		this->cap *= 2;
 	}
-	type_copy(this->top, type);
-	this->top++;
+	type_copy(&this->stack[this->len++], type);
 }
 
 void
-generic_map_init(generic_map_t ref this)
+generic_map_init(generic_map_t ref this, usz n_generics)
 {
-	this->types = NULL;
+	this->cap = n_generics;
+	this->types = alloc(sizeof(type_t) * n_generics, NULL);
 	this->len = 0;
+}
+void
+generic_map_add(generic_map_t ref this, const type_t ref type)
+{
+	if (this->len == this->cap) return;
+
+	type_copy(&this->types[this->len++], type);
 }
 void
 generic_map_deinit(generic_map_t ref this)
@@ -549,6 +511,7 @@ generic_map_deinit(generic_map_t ref this)
 		this->types = NULL;
 	}
 	this->len = 0;
+	this->cap = 0;
 }
 void
 generic_map_display(const generic_map_t ref this, FILE ref file,
