@@ -4,4 +4,4 @@
 -nostdlib
 -std=c11
 -pedantic
--I../mystdlib/src/
+-I../mystdlib/include/
