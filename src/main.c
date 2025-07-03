@@ -102,6 +102,7 @@ main(void)
 
 	type_defs_add(&type_defs, "0", &int_type);
 	type_defs_add(&type_defs, "1", &int_type);
+	type_defs_add(&type_defs, "10", &int_type);
 
 	type_t gt_type;
 	type_init(&gt_type);

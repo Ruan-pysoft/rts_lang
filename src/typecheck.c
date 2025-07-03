@@ -46,7 +46,7 @@ copy_block_type(const block_t ref block, const char ref src,
 		const tok_t tok = block->stackspec.in_types[i];
 		if (src[tok.pos.offset] == '\'') {
 			for (usz j = 0; j < res->t.transform.n_generics; ++j) {
-				if (match(src, &tok, generics[i])) {
+				if (match(src, &tok, generics[j])) {
 					goto generic_already_found;
 				}
 			}
@@ -55,8 +55,10 @@ copy_block_type(const block_t ref block, const char ref src,
 			);
 			memmove(
 				generics[res->t.transform.n_generics],
-				src+tok.pos.offset, tok.len+1
+				src+tok.pos.offset, tok.len
 			);
+			generics[res->t.transform.n_generics][tok.len] = 0;
+			++res->t.transform.n_generics;
 		generic_already_found:;
 		}
 	}
@@ -74,10 +76,16 @@ copy_block_type(const block_t ref block, const char ref src,
 		} else {
 			typespec_init(&res->t.transform.from[i]);
 			res->t.transform.from[i].is_generic = false;
-			type_copy(
-				&res->t.transform.from[i].ts.type,
-				type_defs_lookup_word(type_defs, &tok, src)
-			);
+			res->t.transform.from[i].ts.type.type = TT_SIMPLE;
+			if (match(src, &tok, "int")) {
+				res->t.transform.from[i].ts.type.t.simple = ST_INT;
+			} else if (match(src, &tok, "bool")) {
+				res->t.transform.from[i].ts.type.t.simple = ST_BOOL;
+			} else {
+				/* This should never happen! */
+				fprints("Something went wrong!", stderr, 0);
+				exit(1);
+			}
 		}
 	}
 
@@ -124,10 +132,16 @@ copy_block_type(const block_t ref block, const char ref src,
 		} else {
 			typespec_init(&res->t.transform.to[res_i]);
 			res->t.transform.to[res_i].is_generic = false;
-			type_copy(
-				&res->t.transform.to[res_i].ts.type,
-				type_defs_lookup_word(type_defs, &tok, src)
-			);
+			res->t.transform.to[res_i].ts.type.type = TT_SIMPLE;
+			if (match(src, &tok, "int")) {
+				res->t.transform.to[res_i].ts.type.t.simple = ST_INT;
+			} else if (match(src, &tok, "bool")) {
+				res->t.transform.to[res_i].ts.type.t.simple = ST_BOOL;
+			} else {
+				/* This should never happen! */
+				fprints("Something went wrong!", stderr, 0);
+				exit(1);
+			}
 
 			++res_i;
 		}
@@ -149,6 +163,7 @@ get_type(const item_t ref item, const char ref src,
 			type_copy(res, type_defs_lookup_word(
 				type_defs, &item->item.word, src
 			));
+			return res;
 		break; }
 		case IT_ASSGN: {
 			return gen_assgn_type();
