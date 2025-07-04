@@ -9,9 +9,9 @@
 const char ref src =
 	"[ 'a 'b 'c -> 'c 'a 'b : rot rot ] := unrot\n"
 	"[ int -> ' :\n"
-	"  0 1\n"
-	"  [ int int int -> ' bool : rot 0 > swp drop ]\n"
-	"  [ int int int -> ' : unrot dup rot + ]\n"
+	"  0 1\n" /* $0 a b */
+	"  [ int int int -> ' bool : rot 0 > swp drop ]\n" /* a b $0 cond */
+	"  [ int int int -> ' : 1 - unrot dup rot + ]\n" /* $0-1 b a+b */
 	"  while\n"
 	"] := fib\n"
 	"10 fib\n"
