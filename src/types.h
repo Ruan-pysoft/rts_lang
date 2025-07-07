@@ -48,8 +48,9 @@ typedef struct stackspec_t {
 	usz in_len;
 	tok_t own out_types;
 	usz out_len;
+	pos_t pos;
 } stackspec_t;
-void stackspec_init(stackspec_t ref this);
+void stackspec_init(stackspec_t ref this, pos_t pos);
 void stackspec_deinit(stackspec_t ref this);
 void stackspec_display(const stackspec_t ref this, const char ref src, FILE ref file, err_t ref err_out);
 
@@ -57,8 +58,9 @@ typedef struct block_t {
 	stackspec_t stackspec;
 	struct item_t own items;
 	usz len;
+	pos_t pos;
 } block_t;
-void block_init(block_t ref this);
+void block_init(block_t ref this, pos_t pos);
 void block_deinit(block_t ref this);
 void block_display(const block_t ref this, const char ref src, FILE ref file, err_t ref err_out);
 
@@ -92,21 +94,44 @@ void item_display(const item_t ref this, const char ref src, FILE ref file,
 
 /* typechecking types */
 
+struct type_t;
+
+enum terr_type {
+	TET_OK,
+	TET_INPUT_MISMATCH,
+	TET_BLOCK_FAIL,
+	TET_OTHER,
+};
+
+typedef struct terr_t {
+	enum terr_type type;
+	union terr_union {
+		const struct transform_t ref trans;
+		const block_t ref block;
+		const char ref msg;
+	} at;
+	pos_t pos;
+} terr_t;
+void terr_init(terr_t ref this, pos_t pos);
+void terr_deinit(terr_t ref this);
+void terr_display(const terr_t ref this, const char ref src, FILE ref file, err_t ref err_out);
+bool terr_has_err(const terr_t ref this);
+
 enum simple_type {
 	ST_INT,
 	ST_BOOL,
 };
 void simple_type_display(enum simple_type this, FILE ref file, err_t ref err_out);
 
-struct type_t;
 typedef struct transform_t {
 	usz n_generics;
 	struct type_t own from;
 	usz from_len;
 	struct type_t own to;
 	usz to_len;
+	pos_t pos;
 } transform_t;
-void transform_init(transform_t ref this);
+void transform_init(transform_t ref this, pos_t pos);
 void transform_deinit(transform_t ref this);
 void transform_display(const transform_t ref this, FILE ref file,
 		       err_t ref err_out);
@@ -125,8 +150,9 @@ typedef struct type_t {
 		transform_t trans;
 		usz gen;
 	} t;
+	pos_t pos;
 } type_t;
-void type_init(type_t ref this);
+void type_init(type_t ref this, pos_t pos);
 void type_deinit(type_t ref this);
 void type_display(const type_t ref this, FILE ref file, err_t ref err_out);
 void type_copy(type_t ref to, const type_t ref from);

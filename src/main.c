@@ -66,40 +66,38 @@ main(void)
 
 	flush(stdout, NULL);
 
-	/* TODO: the code below causes a segfault, but I'm too tired to debug it rn */
-
 	type_stack_t type_stack;
 	type_defs_t type_defs;
 	type_stack_init(&type_stack);
 	type_defs_init(&type_defs);
 
 	type_t rot_type;
-	type_init(&rot_type);
+	type_init(&rot_type, (pos_t){0}); /* getting a SEGFAULT here for some reason?? */
 	rot_type.type = TT_TRANSFORM;
-	transform_init(&rot_type.t.trans);
+	transform_init(&rot_type.t.trans, (pos_t){0});
 	rot_type.t.trans.n_generics = 3;
 	rot_type.t.trans.from_len = 3;
 	rot_type.t.trans.from = alloc(sizeof(type_t) * 3, NULL);
 	for (usz i = 0; i < 3; ++i) {
-		type_init(&rot_type.t.trans.from[i]);
+		type_init(&rot_type.t.trans.from[i], (pos_t){0});
 		rot_type.t.trans.from[i].type = TT_GENERIC;
 		rot_type.t.trans.from[i].t.gen = i;
 	}
 	rot_type.t.trans.to_len = 3;
 	rot_type.t.trans.to = alloc(sizeof(type_t) * 3, NULL);
 	for (usz i = 0; i < 3; ++i) {
-		type_init(&rot_type.t.trans.to[i]);
+		type_init(&rot_type.t.trans.to[i], (pos_t){0});
 		rot_type.t.trans.to[i].type = TT_GENERIC;
 		rot_type.t.trans.to[i].t.gen = (i+1)%3;
 	}
 	type_defs_add(&type_defs, "rot", &rot_type);
 
 	type_t int_type;
-	type_init(&int_type);
+	type_init(&int_type, (pos_t){0});
 	int_type.t.simple = ST_INT;
 
 	type_t bool_type;
-	type_init(&bool_type);
+	type_init(&bool_type, (pos_t){0});
 	bool_type.t.simple = ST_BOOL;
 
 	type_defs_add(&type_defs, "0", &int_type);
@@ -107,9 +105,9 @@ main(void)
 	type_defs_add(&type_defs, "10", &int_type);
 
 	type_t gt_type;
-	type_init(&gt_type);
+	type_init(&gt_type, (pos_t){0});
 	gt_type.type = TT_TRANSFORM;
-	transform_init(&gt_type.t.trans);
+	transform_init(&gt_type.t.trans, (pos_t){0});
 	gt_type.t.trans.n_generics = 0;
 	gt_type.t.trans.from_len = 2;
 	gt_type.t.trans.from = alloc(sizeof(type_t) * 2, NULL);
@@ -125,34 +123,34 @@ main(void)
 	type_defs_add(&type_defs, ">", &gt_type);
 
 	type_t swp_type;
-	type_init(&swp_type);
+	type_init(&swp_type, (pos_t){0});
 	swp_type.type = TT_TRANSFORM;
-	transform_init(&swp_type.t.trans);
+	transform_init(&swp_type.t.trans, (pos_t){0});
 	swp_type.t.trans.n_generics = 2;
 	swp_type.t.trans.from_len = 2;
 	swp_type.t.trans.from = alloc(sizeof(type_t) * 2, NULL);
 	for (usz i = 0; i < 2; ++i) {
-		type_init(&swp_type.t.trans.from[i]);
+		type_init(&swp_type.t.trans.from[i], (pos_t){0});
 		swp_type.t.trans.from[i].type = TT_GENERIC;
 		swp_type.t.trans.from[i].t.gen = i;
 	}
 	swp_type.t.trans.to_len = 2;
 	swp_type.t.trans.to = alloc(sizeof(type_t) * 2, NULL);
 	for (usz i = 0; i < 2; ++i) {
-		type_init(&swp_type.t.trans.to[i]);
+		type_init(&swp_type.t.trans.to[i], (pos_t){0});
 		swp_type.t.trans.from[i].type = TT_GENERIC;
 		swp_type.t.trans.to[i].t.gen = 1-i;
 	}
 	type_defs_add(&type_defs, "swp", &swp_type);
 
 	type_t drop_type;
-	type_init(&drop_type);
+	type_init(&drop_type, (pos_t){0});
 	drop_type.type = TT_TRANSFORM;
-	transform_init(&drop_type.t.trans);
+	transform_init(&drop_type.t.trans, (pos_t){0});
 	drop_type.t.trans.n_generics = 1;
 	drop_type.t.trans.from_len = 1;
 	drop_type.t.trans.from = alloc(sizeof(type_t) * 1, NULL);
-	type_init(&drop_type.t.trans.from[0]);
+	type_init(&drop_type.t.trans.from[0], (pos_t){0});
 	drop_type.t.trans.from[0].type = TT_GENERIC;
 	drop_type.t.trans.from[0].t.gen = 0;
 	drop_type.t.trans.to_len = 0;
@@ -160,9 +158,9 @@ main(void)
 	type_defs_add(&type_defs, "drop", &drop_type);
 
 	type_t add_type;
-	type_init(&add_type);
+	type_init(&add_type, (pos_t){0});
 	add_type.type = TT_TRANSFORM;
-	transform_init(&add_type.t.trans);
+	transform_init(&add_type.t.trans, (pos_t){0});
 	add_type.t.trans.n_generics = 0;
 	add_type.t.trans.from_len = 2;
 	add_type.t.trans.from = alloc(sizeof(type_t) * 2, NULL);
@@ -181,9 +179,9 @@ main(void)
 
 	/* TODO: this should be done automatically with the assignment */
 	type_t fib_type;
-	type_init(&fib_type);
+	type_init(&fib_type, (pos_t){0});
 	fib_type.type = TT_TRANSFORM;
-	transform_init(&fib_type.t.trans);
+	transform_init(&fib_type.t.trans, (pos_t){0});
 	fib_type.t.trans.n_generics = 0;
 	fib_type.t.trans.from_len = 1;
 	fib_type.t.trans.from = alloc(sizeof(type_t) * 1, NULL);
@@ -197,27 +195,39 @@ main(void)
 
 	while (toks_pos < toks_len) {
 		type_t type;
+		terr_t err;
+		terr_init(&err, (pos_t){0});
 		item = parse_item(src, toks, toks_len, &toks_pos, NULL); /* wait, am I leaking memory here? */
 		if (!resolve_type(&type, &item, src, &type_defs)) {
 			fputs("Error fetching type of ", stdout, NULL);
 			item_display(&item, src, stdout, NULL);
 			putc('\n', NULL);
 			fputs("Checking: ", stdout, NULL);
-			fprinti(apply_item_toplevel(&type_stack, &item, src, &type_defs), stdout, NULL);
-			putc('\n', NULL);
 		} else {
 			fputs("Type check of ", stdout, NULL);
 			item_display(&item, src, stdout, NULL);
 			fputs(" of type ", stdout, NULL);
 			type_display(&type, stdout, NULL);
 			fputs(": ", stdout, NULL);
-			fprinti(apply_item_toplevel(&type_stack, &item, src, &type_defs), stdout, NULL);
-			putc('\n', NULL);
 		}
+		apply_item_toplevel(&type_stack, &item, src, &type_defs, &err);
+		if (terr_has_err(&err)) {
+			fputs("Got type error!\n", stdout, NULL);
+			terr_display(&err, src, stdout, NULL);
+		} else {
+			fputs("everything's good!", stdout, NULL);
+		}
+		putc('\n', NULL);
 
 		if (item.type == IT_BLOCK) {
 			fputs("Checking if the body lines up: ", stdout, NULL);
-			fprinti(check_block(&item.item.block, src, &type_defs), stdout, NULL);
+			check_block(&item.item.block, src, &type_defs, &err);
+			if (terr_has_err(&err)) {
+				fputs("Got type error!\n", stdout, NULL);
+				terr_display(&err, src, stdout, NULL);
+			} else {
+				fputs("everything's good!", stdout, NULL);
+			}
 			putc('\n', NULL);
 		}
 

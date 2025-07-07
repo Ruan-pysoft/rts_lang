@@ -128,16 +128,18 @@ word_display(const word_t ref this, const char ref src, FILE ref file, err_t ref
 { tok_display(this, src, file, err_out); }
 
 void
-stackspec_init(stackspec_t ref this)
+stackspec_init(stackspec_t ref this, pos_t pos)
 {
 	this->in_types = NULL;
 	this->in_len = 0;
 	this->out_types = NULL;
 	this->out_len = 0;
+	this->pos = pos;
 }
 void
 stackspec_deinit(stackspec_t ref this)
 {
+	pos_deinit(&this->pos);
 	if (this->in_types) {
 		for (usz i = 0; i < this->in_len; ++i) {
 			tok_deinit(&this->in_types[i]);
@@ -178,11 +180,12 @@ stackspec_display(const stackspec_t ref this, const char ref src, FILE ref file,
 }
 
 void
-block_init(block_t ref this)
+block_init(block_t ref this, pos_t pos)
 {
-	stackspec_init(&this->stackspec);
+	stackspec_init(&this->stackspec, pos);
 	this->items = NULL;
 	this->len = 0;
+	this->pos = pos;
 }
 void
 block_deinit(block_t ref this)
@@ -280,6 +283,64 @@ item_display(const item_t ref this, const char ref src, FILE ref file, err_t ref
 /* typechecking types */
 
 void
+terr_init(terr_t ref this, pos_t pos)
+{
+	this->type = TET_OK;
+	this->at.msg = NULL;
+	this->pos = pos;
+}
+void
+terr_deinit(terr_t ref this)
+{
+	this->type = TET_OK;
+	this->at.msg = NULL;
+	pos_deinit(&this->pos);
+}
+void
+terr_display(const terr_t ref this, const char ref src, FILE ref file, err_t ref err_out)
+{
+	err_t err = ERR_OK;
+
+	switch (this->type) {
+		case TET_OK: {
+			fprints("No type error", file, err_out);
+		break; }
+		case TET_INPUT_MISMATCH: {
+			fprints("Input type mismatch: ", file, &err);
+			TRY_VOID(err);
+			transform_display(this->at.trans, file, &err);
+			TRY_VOID(err);
+		break; }
+		case TET_BLOCK_FAIL: {
+			fprints("Block effect does not match output type: ", file, &err);
+			TRY_VOID(err);
+			block_display(this->at.block, src, file, &err);
+			TRY_VOID(err);
+		break; }
+		case TET_OTHER: {
+			fprints("Type error: ", file, &err);
+			TRY_VOID(err);
+			fprints(this->at.msg, file, &err);
+			TRY_VOID(err);
+		break; }
+	}
+
+	fprints(" @ ", file, &err);
+	TRY_VOID(err);
+	fprinti(this->pos.line, file, &err);
+	TRY_VOID(err);
+	fprintc(',', file, &err);
+	TRY_VOID(err);
+	fprinti(this->pos.line_pos, file, &err);
+	TRY_VOID(err);
+}
+bool
+terr_has_err(const terr_t ref this)
+{
+	return this != NULL && this->type != TET_OK;
+}
+
+void
 simple_type_display(enum simple_type this, FILE ref file, err_t ref err_out)
 {
 	switch (this) {
@@ -293,13 +354,14 @@ simple_type_display(enum simple_type this, FILE ref file, err_t ref err_out)
 }
 
 void
-transform_init(transform_t ref this)
+transform_init(transform_t ref this, pos_t pos)
 {
 	this->n_generics = 0;
 	this->from = NULL;
 	this->from_len = 0;
 	this->to = NULL;
 	this->to_len = 0;
+	this->pos = pos;
 }
 void
 transform_deinit(transform_t ref this)
@@ -356,6 +418,7 @@ transform_copy(transform_t ref to, const transform_t ref from)
 	to->n_generics = from->n_generics;
 	to->from_len = from->from_len;
 	to->to_len = from->to_len;
+	to->pos = from->pos;
 
 	to->from = alloc(sizeof(type_t) * to->from_len, NULL);
 	for (usz i = 0; i < to->from_len; ++i) {
@@ -369,26 +432,27 @@ transform_copy(transform_t ref to, const transform_t ref from)
 }
 
 void
-type_init(type_t ref this)
+type_init(type_t ref this, pos_t pos)
 {
 	this->type = TT_SIMPLE;
 	this->t.simple = ST_INT;
+	this->pos = pos;
 }
 void
 type_deinit(type_t ref this)
 {
 	switch (this->type) {
 		case TT_SIMPLE: {
-			type_init(this);
 		break; }
 		case TT_GENERIC: {
-			type_init(this);
 		break; }
 		case TT_TRANSFORM: {
 			transform_deinit(&this->t.trans);
-			type_init(this);
 		break; }
 	}
+	this->type = TT_SIMPLE;
+	this->t.simple = ST_INT;
+	pos_deinit(&this->pos);
 }
 void
 type_display(const type_t ref this, FILE ref file, err_t ref err_out)
@@ -413,6 +477,7 @@ void
 type_copy(type_t ref to, const type_t ref from)
 {
 	to->type = from->type;
+	to->pos = from->pos;
 	switch (from->type) {
 		case TT_SIMPLE: {
 			to->t.simple = from->t.simple;

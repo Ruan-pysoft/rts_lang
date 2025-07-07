@@ -61,7 +61,7 @@ parse_stackspec(const char ref src, tok_t ref toks, usz len, usz ref pos,
 	 * terminated by ":"
 	 */
 
-	stackspec_init(&res);
+	stackspec_init(&res, *pos < len ? toks[*pos].pos : (pos_t){0});
 
 	start = toks + *pos;
 	while (*pos < len && !match(src, &toks[*pos], "->")) {
@@ -121,7 +121,7 @@ parse_block(const char ref src, tok_t ref toks, usz len, usz ref pos,
 	 * and terminated by "]"
 	 */
 
-	block_init(&res);
+	block_init(&res, toks[*pos].pos);
 
 	res.stackspec = parse_stackspec(src, toks, len, pos, perr_out);
 	TRY(block);
