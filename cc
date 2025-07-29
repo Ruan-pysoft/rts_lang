@@ -1,3 +1,3 @@
 #!/bin/sh
 
-g++ -Wall -Wextra -pedantic -std=c++11 $@
+g++ -Wall -Wextra -pedantic -std=c++17 $@

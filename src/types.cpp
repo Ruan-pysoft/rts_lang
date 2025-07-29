@@ -1,8 +1,10 @@
 #include "types.hpp"
 
+#include <cassert>
 #include <memory>
 #include <stdexcept>
 #include <utility>
+#include <variant>
 
 std::ostream & operator<<(std::ostream &os, PrimitiveType prim) {
 	switch (prim) {
@@ -17,75 +19,40 @@ std::ostream & operator<<(std::ostream &os, PrimitiveType prim) {
 	return os;
 }
 
-Type::Type(PrimitiveType primitive) : m_type(TT_PRIMITIVE), t(primitive) {}
-Type::Type(std::vector<TypeRef> list) : m_type(TT_LIST), t(std::move(list)) {}
-Type::Type(std::initializer_list<TypeRef> list) : m_type(TT_LIST), t(list) {}
+Type::Type(PrimitiveType primitive) : t(primitive) {}
+Type::Type(std::vector<TypeRef> list) : t(std::move(list)) {}
+Type::Type(std::initializer_list<TypeRef> list) : t(list) {}
 Type::Type(std::pair<TypeRef, TypeRef> transform)
-	: m_type(TT_TRANSFORM), t(transform) {}
+	: t(transform) {}
 Type::Type(TypeRef from, TypeRef to)
-	: m_type(TT_TRANSFORM), t(std::make_pair(from, to)) {}
+	: t(std::make_pair(from, to)) {}
 Type::Type(std::string genericName)
-	: m_type(TT_GENERIC), t(std::move(genericName)) {}
-Type::Type(TypeRef ofType) : m_type(TT_TYPE), t(ofType) {}
-
-Type::~Type() {
-	switch (m_type) {
-		case TT_PRIMITIVE: {
-			t.primitive.~PrimitiveType();
-		break; }
-		case TT_LIST: {
-			t.list.~vector();
-		break; }
-		case TT_TRANSFORM: {
-			t.transform.~pair();
-		break; }
-		case TT_GENERIC: {
-			t.generic.~basic_string();
-		break; }
-		case TT_TYPE: {
-			t.ofType.~shared_ptr();
-		}
-	}
-}
+	: t(std::move(genericName)) {}
+Type::Type(TypeRef ofType) : t(ofType) {}
 
 TypeType Type::getType() const {
-	return m_type;
+	if (std::holds_alternative<PrimitiveType>(t)) return TT_PRIMITIVE;
+	else if (std::holds_alternative<ListType>(t)) return TT_LIST;
+	else if (std::holds_alternative<TransformType>(t)) return TT_TRANSFORM;
+	else if (std::holds_alternative<Generic>(t)) return TT_GENERIC;
+	else if (std::holds_alternative<TypeRef>(t)) return TT_TYPE;
+	else assert("This shouldbe unreachable!" && false);
 }
 
 const PrimitiveType &Type::getPrimitive() const {
-	if (m_type != TT_PRIMITIVE) {
-		throw std::range_error("Tried accessing primitive value of non-primitive type");
-	}
-
-	return t.primitive;
+	return std::get<PrimitiveType>(t);
 }
-const std::vector<TypeRef> &Type::getList() const {
-	if (m_type != TT_LIST) {
-		throw std::range_error("Tried accessing type list value of non-type list type");
-	}
-
-	return t.list;
+const ListType &Type::getList() const {
+	return std::get<ListType>(t);
 }
-const std::pair<TypeRef, TypeRef> &Type::getTransform() const {
-	if (m_type != TT_TRANSFORM) {
-		throw std::range_error("Tried accessing transform value of non-transform type");
-	}
-
-	return t.transform;
+const TransformType &Type::getTransform() const {
+	return std::get<TransformType>(t);
 }
-const std::string &Type::getGeneric() const {
-	if (m_type != TT_GENERIC) {
-		throw std::range_error("Tried accessing generic value of non-generic type");
-	}
-
-	return t.generic;
+const Generic &Type::getGeneric() const {
+	return std::get<Generic>(t);
 }
 const TypeRef &Type::getTypeof() const {
-	if (m_type != TT_TYPE) {
-		throw std::range_error("Tried accessing subtype value of non-type type");
-	}
-
-	return t.ofType;
+	return std::get<TypeRef>(t);
 }
 
 std::ostream &operator<<(std::ostream &os, const Type &type) {
