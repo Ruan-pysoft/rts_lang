@@ -1,7 +1,4 @@
--ffreestanding
--fno-builtin
--Wno-builtin-declaration-mismatch
--nostdlib
--std=c11
+-Wall
+-Wextra
+-std=c++11
 -pedantic
--I../mystdlib/include/
