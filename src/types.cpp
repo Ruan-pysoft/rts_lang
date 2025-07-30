@@ -1,8 +1,6 @@
 #include "types.hpp"
 
 #include <cassert>
-#include <memory>
-#include <stdexcept>
 #include <utility>
 #include <variant>
 

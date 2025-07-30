@@ -48,8 +48,8 @@ public:
 	const TransformType &getTransform() const;
 	const Generic &getGeneric() const;
 	const TypeRef &getTypeof() const;
-};
 
-std::ostream &operator<<(std::ostream &os, const Type &type);
+	friend std::ostream &operator<<(std::ostream &os, const Type &type);
+};
 
 #endif /* TYPES_H */

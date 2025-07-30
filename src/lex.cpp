@@ -2,7 +2,7 @@
 
 #include <cctype>
 #include <optional>
-#include <string>
+#include <string_view>
 
 std::string_view Token::get_tok(const std::string_view &str) const {
 	return std::string_view(&str[pos], len);
@@ -20,8 +20,9 @@ class Reader {
 		else return {};
 	}
 	inline std::optional<char> advance() {
+		auto res = peek();
 		++m_pos;
-		return peek();
+		return res;
 	}
 	inline bool atspace() {
 		if (!atend()) return isspace(m_src[m_pos]);

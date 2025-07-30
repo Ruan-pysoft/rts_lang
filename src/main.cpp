@@ -1,4 +1,5 @@
 #include "lex.hpp"
+#include "parse.hpp"
 
 #include <iostream>
 
@@ -16,7 +17,7 @@ const auto src =
 ;
 
 int main() {
-	for (auto tok : tokenize(src)) {
-		std::cout << tok.get_tok(src) << '\n';
+	for (auto ast_value : parse(src, std::move(tokenize(src)))) {
+		std::cout << ast_value << '\n';
 	}
 }

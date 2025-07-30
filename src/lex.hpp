@@ -2,7 +2,7 @@
 #define LEX_H
 
 #include <cstddef>
-#include <string>
+#include <string_view>
 #include <vector>
 
 struct Token {
