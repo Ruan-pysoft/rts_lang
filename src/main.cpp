@@ -1,20 +1,22 @@
-#include "types.hpp"
+#include "lex.hpp"
 
 #include <iostream>
 
-int main() {
-	auto Int = TypeRef(new Type(TT_INT));
-	auto CondPost = TypeRef(new Type({
-		TypeRef(new Type(TT_INT)),
-		TypeRef(new Type(TT_BOOL))
-	}));
-	auto Cond = TypeRef(new Type(Int, CondPost));
-	auto Gen = TypeRef(new Type("a"));
-	auto IntType = TypeRef(new Type(Int));
+const auto src =
+	"[rot rot] ('a 'b 'c) ('c 'a 'b) -> : unrot =\n"
+	"[\n"
+	"  0 1 (int int) :\n"
+	"  [rot 0 > swp pop] (int int int) (int int int bool) -> :\n"
+	"  [unrot dup rot +] (int int int) (int int int) -> :\n"
+	"  while\n"
+	"  (int int int) :\n"
+	"  swp pop swp pop\n"
+	"] int int -> : fib =\n"
+	"10 fib\n"
+;
 
-	std::cout << *Int << std::endl;
-	std::cout << *CondPost << std::endl;
-	std::cout << *Cond << std::endl;
-	std::cout << *Gen << std::endl;
-	std::cout << *IntType << std::endl;
+int main() {
+	for (auto tok : tokenize(src)) {
+		std::cout << tok.get_tok(src) << '\n';
+	}
 }
